@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Product;
 use App\Models\OrderStatusHistory;
+use App\Models\Shipment;
 
 class CheckoutController extends Controller
 {
@@ -55,6 +56,18 @@ class CheckoutController extends Controller
             'total'    => $total,
             'status'   => 'pending',
         ]);
+
+        Shipment::create([
+            'order_id' => $order->id,
+            'recipient_name' => $request->recipient_name ?? '',
+            'address' => $request->address ?? '',
+            'city' => $request->city ?? '',
+            'state' => $request->state ?? '',
+            'postal_code' => $request->postal_code ?? '',
+            'phone' => $request->phone ?? '',
+            'status' => 'pending',
+        ]);
+
 
         OrderStatusHistory::create([
             'order_id' => $order->id,

@@ -93,3 +93,13 @@ Route::get(
     '/stores/{store}/orders/{order}/history',
     [OrderController::class, 'history']
 );
+
+Route::get(
+    '/stores/{store}/orders/{order}/shipment',
+    [OrderController::class, 'shipment']
+);
+
+Route::get(
+    'stores/{store}/orders/{order}/tracking',
+    [OrderController::class, 'tracking']
+);

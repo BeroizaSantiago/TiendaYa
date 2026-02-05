@@ -110,6 +110,20 @@ class OrderController extends Controller
         $order->status = $newStatus;
         $order->save();
 
+        // sincronizar shipment si existe
+        if ($order->shipment) {
+            if ($newStatus === 'shipped') {
+                $order->shipment->status = 'shipped';
+                $order->shipment->save();
+            }
+
+            if ($newStatus === 'delivered') {
+                $order->shipment->status = 'delivered';
+                $order->shipment->save();
+            }
+        }
+
+
         OrderStatusHistory::create([
             'order_id' => $order->id,
             'old_status' => $oldStatus,
@@ -134,21 +148,45 @@ class OrderController extends Controller
     }
 
     public function history(int $storeId, int $orderId): JsonResponse
-{
-    $order = Order::where('store_id', $storeId)
-        ->with('statusHistory')
-        ->findOrFail($orderId);
+    {
+        $order = Order::where('store_id', $storeId)
+            ->with('statusHistory')
+            ->findOrFail($orderId);
 
-    return response()->json([
-        'order_id' => $order->id,
-        'history' => $order->statusHistory->map(function ($h) {
-            return [
-                'from' => $h->old_status,
-                'to' => $h->new_status,
-                'changed_at' => $h->created_at,
-            ];
-        }),
-    ]);
-}
+        return response()->json([
+            'order_id' => $order->id,
+            'history' => $order->statusHistory->map(function ($h) {
+                return [
+                    'from' => $h->old_status,
+                    'to' => $h->new_status,
+                    'changed_at' => $h->created_at,
+                ];
+            }),
+        ]);
+    }
 
+
+    public function shipment($storeId, $orderId)
+    {
+        $order = Order::where('store_id', $storeId)
+            ->with('shipment.trackingEvents')
+            ->findOrFail($orderId);
+
+        if (!$order->shipment) {
+            return response()->json([
+                'message' => 'Shipment not found'
+            ], 404);
+        }
+
+        return response()->json($order->shipment);
+    }
+
+    public function tracking($storeId, $orderId)
+    {
+        $order = Order::where('store_id', $storeId)
+            ->with('shipment.trackingEvents')
+            ->findOrFail($orderId);
+
+        return response()->json($order->shipment->trackingEvents);
+    }
 }
