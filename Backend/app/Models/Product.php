@@ -9,15 +9,24 @@ class Product extends Model
 {
     protected $fillable = [
         'store_id',
+        'category_id',
         'name',
         'description',
         'price',
         'stock',
         'active',
     ];
-
-    public function store(): BelongsTo
+    public function store()
     {
-        return $this->belongsTo(Store::class);
+        return $this->belongsTo(\App\Models\Store::class);
+    }
+        public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+        public function attributeStocks()
+    {
+        return $this->hasMany(ProductAttributeStock::class);
     }
 }

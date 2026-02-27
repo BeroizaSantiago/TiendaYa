@@ -9,6 +9,7 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use App\Models\ProductAttributeStock;
 
 class CartController extends Controller
 {
@@ -31,36 +32,36 @@ class CartController extends Controller
      * Ver carrito (por tienda + token)
      * GET /api/stores/{storeId}/cart?token=xxx
      */
-public function show(Request $request, int $storeId): JsonResponse
-{
-    $token = $request->query('token');
+    public function show(Request $request, int $storeId): JsonResponse
+    {
+        $token = $request->query('token');
 
-    $cart = Cart::where('store_id', $storeId)
-        ->where('token', $token)
-        ->with('items.product')
-        ->firstOrFail();
+        $cart = Cart::where('store_id', $storeId)
+            ->where('token', $token)
+            ->with('items.product')
+            ->firstOrFail();
 
-    $items = $cart->items->map(function ($item) {   
-        $subtotal = (float) $item->price * $item->quantity;
+        $items = $cart->items->map(function ($item) {
+            $subtotal = (float) $item->price * $item->quantity;
 
-        return [
-            'product_id' => $item->product_id,
-            'name'       => $item->product->name,
-            'price'      => (float) $item->price,   // snapshot
-            'quantity'   => $item->quantity,
-            'subtotal'   => $subtotal,
-        ];
-    });
+            return [
+                'product_id' => $item->product_id,
+                'name'       => $item->product->name,
+                'price'      => (float) $item->price,   // snapshot
+                'quantity'   => $item->quantity,
+                'subtotal'   => $subtotal,
+            ];
+        });
 
-    return response()->json([
-        'cart' => [
-            'token'       => $cart->token,
-            'items_count' => $items->sum('quantity'),
-            'subtotal'    => $items->sum('subtotal'),
-            'items'       => $items,
-        ],
-    ]);
-}
+        return response()->json([
+            'cart' => [
+                'token'       => $cart->token,
+                'items_count' => $items->sum('quantity'),
+                'subtotal'    => $items->sum('subtotal'),
+                'items'       => $items,
+            ],
+        ]);
+    }
 
 
 
@@ -72,7 +73,8 @@ public function show(Request $request, int $storeId): JsonResponse
     {
         $data = $request->validate([
             'product_id' => ['required', 'integer'],
-            'quantity'   => ['required', 'integer', 'min:1'],
+            'attribute_value_id' => ['required', 'integer', 'exists:attribute_values,id'],
+            'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
         $cart = Cart::where('token', $token)->firstOrFail();
@@ -91,28 +93,33 @@ public function show(Request $request, int $storeId): JsonResponse
         $newQty = $currentQty + $data['quantity'];
 
         // Validar stock
-        if ($newQty > $product->stock) {
+        $productStock = ProductAttributeStock::where('product_id', $product->id)
+            ->where('attribute_value_id', $data['attribute_value_id'])
+            ->firstOrFail();
+
+        if ($newQty > $productStock->stock) {
             return response()->json([
-                'message' => 'Not enough stock available',
-                'stock_available' => $product->stock,
+                'message' => 'Not enough stock for this variant',
+                'stock_available' => $productStock->stock,
             ], 422);
         }
 
-        CartItem::updateOrCreate(
+            CartItem::updateOrCreate(
             [
-                'cart_id'   => $cart->id,
-                'product_id'=> $product->id,
+                'cart_id' => $cart->id,
+                'product_id' => $product->id,
+                'attribute_value_id' => $data['attribute_value_id'],
             ],
             [
                 'quantity' => $newQty,
-                'price'    => $product->price,
+                'price' => $product->price,
             ]
         );
 
         return response()->json([
             'message' => 'Product added to cart',
         ]);
-}
+    }
 
 
     public function removeItem(Request $request, int $storeId, int $itemId): JsonResponse
@@ -132,26 +139,24 @@ public function show(Request $request, int $storeId): JsonResponse
         return response()->json([
             'message' => 'Item removed from cart',
         ]);
-}
-
-public function decrementItem(string $token, int $itemId): JsonResponse
-{
-    $cart = Cart::where('token', $token)->firstOrFail();
-
-    $item = CartItem::where('id', $itemId)
-        ->where('cart_id', $cart->id)
-        ->firstOrFail();
-
-    if ($item->quantity > 1) {
-        $item->decrement('quantity');
-    } else {
-        $item->delete();
     }
 
-    return response()->json([
-        'message' => 'Item updated',
-    ]);
-}
+    public function decrementItem(string $token, int $itemId): JsonResponse
+    {
+        $cart = Cart::where('token', $token)->firstOrFail();
 
+        $item = CartItem::where('id', $itemId)
+            ->where('cart_id', $cart->id)
+            ->firstOrFail();
 
+        if ($item->quantity > 1) {
+            $item->decrement('quantity');
+        } else {
+            $item->delete();
+        }
+
+        return response()->json([
+            'message' => 'Item updated',
+        ]);
+    }
 }

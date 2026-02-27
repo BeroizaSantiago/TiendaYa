@@ -25,12 +25,17 @@ class ProductController extends Controller
     public function show(int $storeId, int $productId): JsonResponse
     {
         $product = Product::where('store_id', $storeId)
-            ->where('id', $productId)
-            ->where('active', true)
-            ->firstOrFail();
+        ->where('id', $productId)
+        ->where('active', true)
+        ->with([
+            'attributeStocks.attributeValue.attribute'
+        ])
+        ->firstOrFail();
 
         return response()->json(
             new ProductResource($product)
         );
     }
+
+    
 }

@@ -3,24 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CartItem extends Model
+class ProductAttributeStock extends Model
 {
+    protected $table = 'product_attribute_stock';
+
     protected $fillable = [
-        'cart_id',
         'product_id',
         'attribute_value_id',
-        'quantity',
-        'price',
+        'stock'
     ];
 
-    public function cart(): BelongsTo
-    {
-        return $this->belongsTo(Cart::class);
-    }
-
-    public function product(): BelongsTo
+    public function product()
     {
         return $this->belongsTo(Product::class);
     }
@@ -29,4 +23,5 @@ class CartItem extends Model
     {
         return $this->belongsTo(AttributeValue::class);
     }
+    
 }

@@ -7,6 +7,10 @@ use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\OrderStatusHistory;
+use App\Models\Product;
+use App\Models\ProductAttributeStock;
+use Illuminate\Support\Facades\DB;
+
 
 
 class OrderController extends Controller
@@ -43,29 +47,65 @@ class OrderController extends Controller
     // Cancelar orden
     public function cancel(int $storeId, int $orderId): JsonResponse
     {
-        $order = Order::where('store_id', $storeId)
-            ->with('items')
-            ->findOrFail($orderId);
+        return DB::transaction(function () use ($storeId, $orderId) {
 
-        // solo permitir cancelar si no está finalizada
-        if ($order->status === 'completed') {
+            $order = Order::where('store_id', $storeId)
+                ->with('items')
+                ->lockForUpdate()
+                ->findOrFail($orderId);
+
+            if ($order->status === 'completed') {
+                return response()->json([
+                    'message' => 'Completed orders cannot be cancelled',
+                ], 422);
+            }
+
+            if ($order->status === 'cancelled') {
+                return response()->json([
+                    'message' => 'Order already cancelled',
+                ], 422);
+            }
+
+            foreach ($order->items as $item) {
+
+                // Bloquear producto
+                $product = Product::where('id', $item->product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $product->increment('stock', $item->quantity);
+
+                // Si tiene variante, devolver stock variante
+                if ($item->attribute_value_id) {
+
+                    $productStock = ProductAttributeStock::where('product_id', $item->product_id)
+                        ->where('attribute_value_id', $item->attribute_value_id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($productStock) {
+                        $productStock->increment('stock', $item->quantity);
+                    }
+                }
+            }
+
+            $oldStatus = $order->status;
+
+            $order->status = 'cancelled';
+            $order->save();
+
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'old_status' => $oldStatus,
+                'new_status' => 'cancelled',
+            ]);
+
             return response()->json([
-                'message' => 'Completed orders cannot be cancelled',
-            ], 422);
-        }
-
-        // devolver stock
-        foreach ($order->items as $item) {
-            $item->product()->increment('stock', $item->quantity);
-        }
-
-        $order->status = 'cancelled';
-        $order->save();
-
-        return response()->json([
-            'message' => 'Order cancelled',
-        ]);
+                'message' => 'Order cancelled',
+            ]);
+        });
     }
+
     // Actualizar estado de la orden
     public function updateStatus(Request $request, int $storeId, int $orderId)
     {
@@ -109,19 +149,6 @@ class OrderController extends Controller
 
         $order->status = $newStatus;
         $order->save();
-
-        // sincronizar shipment si existe
-        if ($order->shipment) {
-            if ($newStatus === 'shipped') {
-                $order->shipment->status = 'shipped';
-                $order->shipment->save();
-            }
-
-            if ($newStatus === 'delivered') {
-                $order->shipment->status = 'delivered';
-                $order->shipment->save();
-            }
-        }
 
 
         OrderStatusHistory::create([

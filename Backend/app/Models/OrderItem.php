@@ -10,6 +10,7 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'product_id',
+        'attribute_value_id',
         'name',
         'price',
         'quantity',
@@ -25,4 +26,9 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function attributeValue()
+{
+    return $this->belongsTo(AttributeValue::class);
+}
 }

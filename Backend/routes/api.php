@@ -1,105 +1,143 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\StoreController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CartItemController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
-use App\Http\Controllers\Api\StoreController;
 use App\Http\Controllers\Api\Admin\AdminProductController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\AttributeController;
+use App\Http\Controllers\Api\AttributeValueController;
+use App\Http\Controllers\Api\ProductAttributeStockController;
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\DeliveryNoteController;
 
 
-Route::prefix('admin/stores/{store}')->group(function () {
-    Route::get('/products', [AdminProductController::class, 'index']);
-    Route::post('/products', [AdminProductController::class, 'store']);
-    Route::get('/products/{product}', [AdminProductController::class, 'show']);
-    Route::put('/products/{product}', [AdminProductController::class, 'update']);
-    Route::delete('/products/{product}', [AdminProductController::class, 'destroy']);
+/*
+|--------------------------------------------------------------------------
+| AUTH
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('auth')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+
+    Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+    Route::middleware('auth:sanctum')->group(function () {});
 });
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('categories', CategoryController::class)
+        ->only(['index', 'store']);
+    Route::apiResource('attributes', AttributeController::class)
+        ->only(['index', 'store']);
+    Route::post('attribute-values', [AttributeValueController::class, 'store']);
+
+    Route::post('product-attribute-stock', [ProductAttributeStockController::class, 'store']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| AUTHENTICATED USER
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/user', function (Request $request) {
+        return $request->user()->load('store');
+    });
+
+    Route::get('/users', [UserController::class, 'index']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('admin')->group(function () {
+        Route::apiResource('products', AdminProductController::class);
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| STORES (Public)
+|--------------------------------------------------------------------------
+*/
 
 Route::get('/stores', [StoreController::class, 'index']);
 
-Route::get('/stores/{storeId}/products', [ProductController::class, 'index']);
+Route::prefix('stores/{store}')->group(function () {
 
-Route::get(
-    '/stores/{storeId}/products/{productId}',
-    [ProductController::class, 'show']
-);
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCTS
+    |--------------------------------------------------------------------------
+    */
 
-Route::post(
-    '/stores/{storeId}/cart',
-    [CartController::class, 'create']
-);
+    Route::get('/products', [ProductController::class, 'index']);
+    Route::get('/products/{product}', [ProductController::class, 'show']);
 
-Route::get(
-    '/stores/{storeId}/cart',
-    [CartController::class, 'show']
-    
-);
+    /*
+    |--------------------------------------------------------------------------
+    | CART
+    |--------------------------------------------------------------------------
+    */
 
-Route::post(
-    '/stores/{storeId}/cart/items',
-    [CartController::class, 'addItem']
-);
+    Route::post('/cart', [CartController::class, 'create']);
+    Route::get('/cart', [CartController::class, 'show']);
 
-Route::delete(
-    '/stores/{storeId}/cart/items/{itemId}',
-    [CartController::class, 'removeItem']
-);
+    Route::prefix('cart')->group(function () {
+        Route::post('/items', [CartItemController::class, 'store']);
+        Route::delete('/items/{item}', [CartController::class, 'removeItem']);
+    });
 
-Route::patch(
-    '/cart/{token}/items/{itemId}/decrement',
-    [CartController::class, 'decrementItem']
-);
+    /*
+    |--------------------------------------------------------------------------
+    | CHECKOUT
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/checkout', [CheckoutController::class, 'checkout']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDERS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{order}', [OrderController::class, 'show']);
+    Route::get('/orders/{order}/history', [OrderController::class, 'history']);
+    Route::get('/orders/{order}/shipment', [OrderController::class, 'shipment']);
+    Route::get('/orders/{order}/tracking', [OrderController::class, 'tracking']);
+
+    Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel']);
+    Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GLOBAL CART ACTIONS
+|--------------------------------------------------------------------------
+*/
+
+Route::patch('/cart/{token}/items/{item}/decrement', [CartController::class, 'decrementItem']);
 
 
-Route::post(
-    '/stores/{storeId}/cart/items',
-    [CartItemController::class, 'store']
-);
-
-Route::post(
-    '/stores/{storeId}/checkout',
-    [CheckoutController::class, 'checkout']
-);
-
-Route::post(
-    '/orders/{orderId}/status',
-    [CheckoutController::class, 'updateStatus']
-);
-
-Route::get(
-    '/stores/{storeId}/orders',
-    [OrderController::class, 'index']
-);
-
-Route::post(
-    '/stores/{storeId}/orders/{orderId}/cancel',
-    [OrderController::class, 'cancel']
-);
-
-Route::patch(
-    'stores/{store}/orders/{order}/status',
-    [OrderController::class, 'updateStatus']
-);
-
-Route::get(
-    '/stores/{store}/orders/{order}', 
-    [OrderController::class, 'show']
-);
-
-Route::get(
-    '/stores/{store}/orders/{order}/history',
-    [OrderController::class, 'history']
-);
-
-Route::get(
-    '/stores/{store}/orders/{order}/shipment',
-    [OrderController::class, 'shipment']
-);
-
-Route::get(
-    'stores/{store}/orders/{order}/tracking',
-    [OrderController::class, 'tracking']
-);
+/*|--------------------------------------------------------------------------
+| INVOICES & DELIVERY NOTES 
+|--------------------------------------------------------------------------
+*/
+Route::post('orders/{order}/invoice', [InvoiceController::class, 'issue']);
+Route::post('orders/{order}/delivery-note', [DeliveryNoteController::class, 'issue']);

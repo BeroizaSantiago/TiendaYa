@@ -51,4 +51,14 @@ class Order extends Model
         return $this->hasOne(Shipment::class);
     }
 
+        public function invoice()
+    {
+        return $this->hasOne(Invoice::class);
+    }
+
+    public function deliveryNote()
+    {
+        return $this->hasOne(DeliveryNote::class);
+    }
+
 }
