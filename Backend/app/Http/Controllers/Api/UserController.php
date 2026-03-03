@@ -10,7 +10,7 @@ class UserController extends Controller
     public function index()
     {
         return response()->json([
-            'users' => User::with('store')->get()
+            'users' => User::with('stores')->get()
         ]);
     }
 }

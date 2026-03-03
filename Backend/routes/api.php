@@ -18,6 +18,9 @@ use App\Http\Controllers\Api\AttributeValueController;
 use App\Http\Controllers\Api\ProductAttributeStockController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\DeliveryNoteController;
+use App\Http\Controllers\Api\MeController;
+use App\Http\Controllers\Api\StoreUserController;
+use App\Http\Controllers\Api\StoreMemberController;
 
 
 /*
@@ -53,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', function (Request $request) {
-        return $request->user()->load('store');
+        return $request->user()->load('stores');
     });
 
     Route::get('/users', [UserController::class, 'index']);
@@ -69,6 +72,14 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+/**
+ * Ruta para obtener el plan del usuario autenticado
+ */
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/me/plan', [MeController::class, 'plan']);
+});
+
 /*
 |--------------------------------------------------------------------------
 | STORES (Public)
@@ -76,6 +87,16 @@ Route::middleware('auth:sanctum')->group(function () {
 */
 
 Route::get('/stores', [StoreController::class, 'index']);
+
+/*
+|--------------------------------------------------------------------------
+| STORES (Authenticated)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/stores', [StoreController::class, 'store']);
+});
 
 Route::prefix('stores/{store}')->group(function () {
 
@@ -126,6 +147,22 @@ Route::prefix('stores/{store}')->group(function () {
     Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
 });
 
+
+/*
+|--------------------------------------------------------------------------
+| STORE USERS
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/stores/{store}/users', [StoreUserController::class, 'listUsers']);
+    Route::post('/stores/{store}/users', [StoreUserController::class, 'addUser']);
+    Route::delete('/stores/{store}/users/{user}', [StoreUserController::class, 'removeUser']);
+
+});
+
+
+
 /*
 |--------------------------------------------------------------------------
 | GLOBAL CART ACTIONS
@@ -141,3 +178,23 @@ Route::patch('/cart/{token}/items/{item}/decrement', [CartController::class, 'de
 */
 Route::post('orders/{order}/invoice', [InvoiceController::class, 'issue']);
 Route::post('orders/{order}/delivery-note', [DeliveryNoteController::class, 'issue']);
+
+
+/*
+|--------------------------------------------------------------------------
+| STORE MEMBERS (OWNER ONLY)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post(
+        '/stores/{store}/members',
+        [StoreMemberController::class, 'addMember']
+    )->middleware('store.role:owner');
+
+    Route::delete(
+        '/stores/{store}/members/{userId}',
+        [StoreMemberController::class, 'removeMember']
+    )->middleware('store.role:owner');
+});

@@ -48,8 +48,28 @@ class User extends Authenticatable
     }
 
 
-        public function store()
+        public function stores()
+        {
+            return $this->belongsToMany(Store::class)
+                ->withPivot('role')
+                ->withTimestamps();
+        }
+
+
+    public function canUse(string $feature): bool
     {
-        return $this->hasOne(\App\Models\Store::class);
+        if (!$this->plan) {
+            return false;
+        }
+
+        return match($feature) {
+            'bulk_upload' => $this->plan->bulk_upload,
+            'advanced_reports' => $this->plan->advanced_reports,
+            'advanced_coupons' => $this->plan->advanced_coupons,
+            'b2b' => $this->plan->b2b_enabled,
+            'custom_integrations' => $this->plan->custom_integrations,
+            default => false
+        };
     }
+
 }

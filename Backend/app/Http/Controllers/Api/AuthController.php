@@ -9,6 +9,7 @@ use App\Models\Store;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use App\Models\Plan;
 
 
 class AuthController extends Controller
@@ -17,32 +18,25 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6|confirmed',
             'role' => 'required|in:emprendedor,pyme,mayorista',
-            'store_name' => 'required|string|max:255'
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => $validated['password'], 
+            'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
             'status' => $validated['role'] === 'mayorista' ? 'pending' : 'active'
-        ]);
-
-        $store = Store::create([
-            'user_id' => $user->id,
-            'name' => $validated['store_name'],
-            'slug' => Str::slug($validated['store_name']) . '-' . uniqid(),
-            'active' => true
+            
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
+            'message' => 'User registered successfully',
             'user' => $user,
-            'store' => $store,
             'token' => $token
         ], 201);
     }
@@ -70,11 +64,10 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
         
-
+        $user = User::with('stores')->find($user->id);
         return response()->json([
-            'user' => $user,
-            'store' => $user->store,
-            'token' => $token
+        'user' => $user,
+        'token' => $token   
         ]);
     }
 

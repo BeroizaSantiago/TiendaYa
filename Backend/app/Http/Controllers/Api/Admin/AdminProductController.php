@@ -6,12 +6,29 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 
 class AdminProductController extends Controller
 {
-    protected function getStore()
+    /**
+     * Resolver la tienda desde el header X-Store-Id
+     * y verificar que pertenezca al usuario autenticado
+     */
+    protected function getStore(Request $request)
     {
-        $store = Auth::user()->store;
+        $storeId = $request->header('X-Store-Id');
+
+        if (!$storeId) {
+            abort(400, 'X-Store-Id header is required');
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        $store = $user->stores()
+            ->with('plan')
+            ->where('stores.id', $storeId)
+            ->first();
 
         if (!$store) {
             abort(404, 'Store not found for this user');
@@ -20,23 +37,37 @@ class AdminProductController extends Controller
         return $store;
     }
 
-    // Listar productos
-    public function index()
+    /**
+     * Verificar rol (owner o editor)
+     */
+    protected function checkRole($store)
     {
-        $store = $this->getStore();
+        $membership = $store->users()
+            ->where('users.id', Auth::id())
+            ->first();
+
+        if (!$membership || !in_array($membership->pivot->role, ['owner', 'editor'])) {
+            abort(403, 'Unauthorized');
+        }
+    }
+
+    // Listar productos
+    public function index(Request $request)
+    {
+        $store = $this->getStore($request);
 
         return response()->json(
-        $store->products()
-        ->with('attributeStocks.attributeValue.attribute')
-        ->latest()
-        ->get()
-);
+            $store->products()
+                ->with('attributeStocks.attributeValue.attribute')
+                ->latest()
+                ->get()
+        );
     }
 
     // Crear producto
     public function store(Request $request)
     {
-        $store = $this->getStore();
+        $store = $this->getStore($request);
 
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
@@ -45,6 +76,22 @@ class AdminProductController extends Controller
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
         ]);
+
+        // Verificar rol
+        $this->checkRole($store);
+
+        // Obtener plan desde la tienda (NO desde user)
+        $plan = $store->plan;
+
+        // Validar límite de productos según plan
+        if ($plan && $plan->max_products !== null) {
+
+            $count = $store->products()->count();
+
+            if ($count >= $plan->max_products) {
+                abort(403, 'Product limit reached for your plan');
+            }
+        }
 
         $product = $store->products()->create([
             ...$validated,
@@ -55,9 +102,9 @@ class AdminProductController extends Controller
     }
 
     // Ver producto individual
-    public function show($productId)
+    public function show(Request $request, $productId)
     {
-        $store = $this->getStore();
+        $store = $this->getStore($request);
 
         $product = $store->products()
             ->with('attributeStocks.attributeValue.attribute')
@@ -70,7 +117,10 @@ class AdminProductController extends Controller
     // Actualizar producto
     public function update(Request $request, $productId)
     {
-        $store = $this->getStore();
+        $store = $this->getStore($request);
+
+        // Verificar rol
+        $this->checkRole($store);
 
         $product = $store->products()
             ->where('id', $productId)
@@ -90,9 +140,12 @@ class AdminProductController extends Controller
     }
 
     // Eliminar producto
-    public function destroy($productId)
+    public function destroy(Request $request, $productId)
     {
-        $store = $this->getStore();
+        $store = $this->getStore($request);
+
+        // Verificar rol
+        $this->checkRole($store);
 
         $product = $store->products()
             ->where('id', $productId)

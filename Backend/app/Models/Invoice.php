@@ -13,6 +13,7 @@ class Invoice extends Model
         'invoice_number',
         'total',
         'status',
+        'commission_amount',
         'issued_at',
     ];
 

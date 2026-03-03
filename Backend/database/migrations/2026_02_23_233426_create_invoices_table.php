@@ -27,6 +27,8 @@ public function up(): void
 
         $table->decimal('total', 12, 2);
 
+        $table->decimal('commission_amount', 12, 2);
+
         $table->string('status'); // pending, paid, cancelled
 
         $table->timestamp('issued_at');

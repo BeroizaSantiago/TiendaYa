@@ -11,6 +11,7 @@ class Store extends Model
         'user_id',
         'name',
         'slug',
+        'plan_id',
         'active',
     ];
 
@@ -25,13 +26,19 @@ class Store extends Model
     }
 
     public function owner()
-{
-    return $this->belongsTo(\App\Models\User::class, 'user_id');
-}
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
+    }
 
-public function user()
-{
-    return $this->belongsTo(\App\Models\User::class);
+    public function users()
+    {
+        return $this->belongsToMany(User::class)
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
 }
-}
-    

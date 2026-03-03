@@ -26,31 +26,57 @@ class OrderObserver
             return;
         }
 
-        $order->load('store');
+        $order->load(['store.users', 'store.plan']);
 
-        $userId = $order->store?->user_id;
+        $store = $order->store;
 
-        if (!$userId) {
+        if (!$store) {
             return;
         }
 
+        // Obtener el owner de la tienda (role = owner)
+        $owner = $store->users()
+            ->wherePivot('role', 'owner')
+            ->first();
+
+        if (!$owner) {
+            return;
+        }
+
+        $userId = $owner->id;
+
         $newStatus = $order->status;
 
+        // Plan ahora pertenece a la store
+        $commissionRate = $store->plan?->commission_rate ?? 0;
+        $commissionAmount = $order->total * $commissionRate;
+
+        /*
+    |--------------------------------------------------------------------------
+    | INVOICE
+    |--------------------------------------------------------------------------
+    */
         if ($newStatus === 'paid' && !$order->invoice()->exists()) {
 
             $nextNumber = (Invoice::max('invoice_number') ?? 0) + 1;
 
             Invoice::create([
-                'order_id'       => $order->id,
-                'user_id'        => $userId,
-                'invoice_type'   => 'B',
-                'invoice_number' => $nextNumber,
-                'total'          => $order->total,
-                'status'         => 'issued',
-                'issued_at'      => now(),
+                'order_id'         => $order->id,
+                'user_id'          => $userId,
+                'invoice_type'     => 'B',
+                'invoice_number'   => $nextNumber,
+                'total'            => $order->total,
+                'status'           => 'issued',
+                'commission_amount' => $commissionAmount,
+                'issued_at'        => now(),
             ]);
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | DELIVERY NOTE
+    |--------------------------------------------------------------------------
+    */
         if ($newStatus === 'shipped' && !$order->deliveryNote()->exists()) {
 
             $nextNumber = (DeliveryNote::max('delivery_number') ?? 0) + 1;
@@ -64,8 +90,11 @@ class OrderObserver
             ]);
         }
 
-
-
+        /*
+    |--------------------------------------------------------------------------
+    | SHIPMENT TRACKING
+    |--------------------------------------------------------------------------
+    */
         if ($newStatus === 'shipped') {
 
             $order->load('shipment');
@@ -81,9 +110,9 @@ class OrderObserver
                 $shipment->save();
 
                 $shipment->trackingEvents()->create([
-                    'status' => 'shipped',
+                    'status'      => 'shipped',
                     'description' => 'Shipment dispatched from warehouse',
-                    'location' => 'Main Warehouse'
+                    'location'    => 'Main Warehouse'
                 ]);
             }
         }
@@ -99,9 +128,9 @@ class OrderObserver
                 $shipment->save();
 
                 $shipment->trackingEvents()->create([
-                    'status' => 'delivered',
+                    'status'      => 'delivered',
                     'description' => 'Package delivered to recipient',
-                    'location' => $shipment->city
+                    'location'    => $shipment->city
                 ]);
             }
         }
