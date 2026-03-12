@@ -41,4 +41,20 @@ class Store extends Model
     {
         return $this->belongsTo(Plan::class);
     }
+
+        public function canUse(string $feature): bool
+    {
+        if (!$this->plan) {
+            return false;
+        }
+
+        return match($feature) {
+            'bulk_upload' => $this->plan->bulk_upload,
+            'advanced_reports' => $this->plan->advanced_reports,
+            'advanced_coupons' => $this->plan->advanced_coupons,
+            'b2b' => $this->plan->b2b_enabled,
+            'custom_integrations' => $this->plan->custom_integrations,
+            default => false
+        };
+    }
 }

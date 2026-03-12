@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use App\Models\Plan;
+use App\Models\ValidationHistory;
 
 
 class AuthController extends Controller
@@ -21,6 +22,12 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6|confirmed',
             'role' => 'required|in:emprendedor,pyme,mayorista',
+
+            // SOLO si es mayorista
+            'phone' => 'required_if:role,mayorista',
+            'address' => 'required_if:role,mayorista',
+            'cuit' => 'required_if:role,mayorista',
+            'business_name' => 'required_if:role,mayorista',
         ]);
 
         $user = User::create([
@@ -28,9 +35,24 @@ class AuthController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'cuit' => $validated['cuit'] ?? null,
+            'business_name' => $validated['business_name'] ?? null,
             'status' => $validated['role'] === 'mayorista' ? 'pending' : 'active'
-            
         ]);
+
+        /*
+    Crear historial si es mayorista
+    */
+
+        if ($user->role === 'mayorista') {
+
+            ValidationHistory::create([
+                'user_id' => $user->id,
+                'validation_status' => 'pending'
+            ]);
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -63,11 +85,11 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
-        
+
         $user = User::with('stores')->find($user->id);
         return response()->json([
-        'user' => $user,
-        'token' => $token   
+            'user' => $user,
+            'token' => $token
         ]);
     }
 

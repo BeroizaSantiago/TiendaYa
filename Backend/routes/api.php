@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\StoreUserController;
 use App\Http\Controllers\Api\StoreMemberController;
+use App\Http\Controllers\Api\Admin\WholesalerValidationController;
 
 
 /*
@@ -197,4 +198,21 @@ Route::middleware('auth:sanctum')->group(function () {
         '/stores/{store}/members/{userId}',
         [StoreMemberController::class, 'removeMember']
     )->middleware('store.role:owner');
+});
+
+
+/* 
+|--------------------------------------------------------------------------
+| ADMIN - WHOLESALER VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/admin/wholesalers/{user}/approve',
+        [WholesalerValidationController::class, 'approve']);
+
+    Route::post('/admin/wholesalers/{user}/reject',
+        [WholesalerValidationController::class, 'reject']);
+
 });

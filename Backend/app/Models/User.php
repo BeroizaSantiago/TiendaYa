@@ -21,7 +21,11 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'status'
+        'status',
+        'phone',
+        'address',
+        'cuit',
+        'business_name'
     ];
 
     /**
@@ -55,21 +59,10 @@ class User extends Authenticatable
                 ->withTimestamps();
         }
 
-
-    public function canUse(string $feature): bool
-    {
-        if (!$this->plan) {
-            return false;
+        public function validations()
+        {
+            return $this->hasMany(ValidationHistory::class);
         }
 
-        return match($feature) {
-            'bulk_upload' => $this->plan->bulk_upload,
-            'advanced_reports' => $this->plan->advanced_reports,
-            'advanced_coupons' => $this->plan->advanced_coupons,
-            'b2b' => $this->plan->b2b_enabled,
-            'custom_integrations' => $this->plan->custom_integrations,
-            default => false
-        };
-    }
 
 }
